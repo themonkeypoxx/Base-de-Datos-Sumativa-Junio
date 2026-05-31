@@ -1,0 +1,7 @@
+fecha_obj = fecha_str.strptime(fecha_str, "%Y-%m-%d")
+        #ORDENANDOLO PARA LA CONSULTA
+        inicio_dia = datetime(fecha_obj.year, fecha_obj.month, fecha_obj.day, 0, 0, 0)
+        fin_dia = datetime(fecha_obj.year, fecha_obj.month, fecha_obj.day, 23, 59, 59)
+        filtro = {fecha: {"$gte": inicio_dia, "$lte": fin_dia}}
+
+##save
