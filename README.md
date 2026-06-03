@@ -1,4 +1,5 @@
 # Base-de-Datos-Sumativa-Junio
 
-instalar pymongo y datetime
+instalar pymongo 
+instalar re
 / Correr en terminal dedicada
