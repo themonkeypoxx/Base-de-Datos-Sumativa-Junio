@@ -72,8 +72,15 @@ def cruzada(coleccion, pipeline, tipo):
         if not resultados:
             print("⚠️ No se encontraron registros.")
         else:
-            for documento in resultados:
-                print(documento)
+            if tipo == "Top 3 eventos con más confirmados":
+                cta = 1
+                for documento in resultados:
+                    print(f"{cta}.-", documento)
+                    cta = cta + 1
+            else:
+                for documento in resultados:
+                    print(documento)
+                
     except Exception as e:
         print(f"⚠️ Error al realizar la consulta: {e}")
 
@@ -181,6 +188,33 @@ def inputConfirmacion(coleccion1, coleccion2):
             }
         ]
     return pipeline
+
+def pipelineTop3():
+    pipeline = [
+        {"$unwind": "$invitados"},
+        {"$match": {"invitados.estado": "confirmado"}},
+        {
+            "$group": {
+                "_id": "$_id",
+                "codigo": {"$first": "$codigo"},
+                "nombre": {"$first": "$nombre"},
+                "fecha": {"$first": "$fecha"},
+                "total_confirmados": {"$sum": 1}
+            }
+        },
+        {"$sort": {"total_confirmados": -1}},
+        {"$limit": 3},
+        {
+            "$project": {
+                "_id": 0,
+                "codigo": 1,
+                "nombre": 1,
+                "fecha": 1,
+                "total_confirmados": 1
+            }
+        }
+    ]
+    return pipeline
 ###############################################
 ############## MENÚ ###########################
 ###############################################
@@ -193,8 +227,8 @@ def menu():
     print("\n 1.- Listar eventos")
     print(" 2.- Buscar invitados por nombre ")
     print(" 3.- Confirmar asistencia de invitado a evento")
-    print(" 4.- ")
-    print(" 5.- Buscar por dominio de correo")
+    print(" 4.- Top 3 eventos más asistidos")
+    print(" 5.- Buscar invitados por dominio de correo")
     print(" 6.- Salir")
 
 def main():
