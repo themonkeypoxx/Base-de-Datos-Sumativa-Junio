@@ -2,11 +2,11 @@ from pymongo import MongoClient
 import os
 import re #esto lo usé para verificar los correos antes de realizar consultas
 
-mongosito = "mongodb://localhost:27017/"
+mongosito = "mongodb://127.0.0.1:27017/?directConnection=true&serverSelectionTimeoutMS=2000&appName=mongosh+2.8.1" 
 nombreDB = "Sumativa"
 col1 = "eventos"
 col2 = "invitados"
-
+#  11.098.760-0 asiste en evento 1. (para testeo)
 def conexion():
     try:
         client = MongoClient(mongosito)
@@ -284,6 +284,7 @@ def main():
                 break
         elif seleccion == 6:
             input("Presione ENTER para continuar...")
+            os.system('cls')
             break
 
     client.close()
