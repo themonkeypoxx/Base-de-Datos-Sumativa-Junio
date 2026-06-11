@@ -14,7 +14,7 @@ def conexion():
         return client, db
     except Exception as e:
         print(f"⚠️ Error al establecer conexión: {e}")
-        return None, None
+        return None, None 
 
 ######################################################
 ################# CONSULTAS ########################## ###Estandarizadas (soy entero bkn)
@@ -44,7 +44,10 @@ def estandar(coleccion, filtro_ctdo, proyeccion_ctdo, tipo):
 
 def verificacion(coleccion, col1, col2, inputUser):
     if coleccion == col2:
-        filtro_ctdo = {"rut": inputUser}
+        if "@" in inputUser or ".cl" in inputUser or ".com" in inputUser:
+            filtro_ctdo = {"correo": inputUser}
+        else:
+            filtro_ctdo = {"rut": inputUser}
     elif coleccion == col1:
         filtro_ctdo = {"codigo": {"$regex": inputUser}}
     try:
@@ -62,7 +65,7 @@ def verificacion(coleccion, col1, col2, inputUser):
 ######          Consultas AGGREGATE )     ############
 ######################################################
 
-def cruzada(coleccion, pipeline, tipo):
+def cruzada(coleccion, pipeline, tipo, numeroValido):
     os.system('cls')
     print("-"*75)
     print("-📖 Resultados de la consulta-")
@@ -72,7 +75,7 @@ def cruzada(coleccion, pipeline, tipo):
         if not resultados:
             print("⚠️ No se encontraron registros.")
         else:
-            if tipo == "Top 3 eventos con más confirmados":
+            if tipo == f"Top {numeroValido} eventos con más confirmados":
                 cta = 1
                 for documento in resultados:
                     print(f"{cta}.-", documento)
@@ -92,11 +95,21 @@ def cruzada(coleccion, pipeline, tipo):
 
 def inputNombre():
     os.system('cls')
-    nombre = input("Ingrese el nombre del invitado: ")
+    nombre = input("Ingrese el nombre / apellido del invitado: ")
     #la i es para hacerlo case insentitive (q de igual si hay mayúsculas o no)
     filtro_ctdo = {"nombre": {"$regex": nombre, "$options": "i" }}
-    proyeccion_ctdo = {"_id": 0, "rut": 0}
+    proyeccion_ctdo = {"_id": 0, "correo": 0, "empresa": 0, "estado": 0}
     return filtro_ctdo, proyeccion_ctdo
+
+def inputCategoria():
+    os.system('cls')
+    print("Las categorías son: \n1.- Charla\n2.-Meetup\n3.-Workshop")
+    categoria = input ("Ingrese la categoria del evento: ")
+    #requerimniento categoria 
+    filtro_ctdo = {"categoria": {"$regex": categoria, "$options": "i"}}
+    proyeccion_ctdo = {"_id": 0, "codigo": 1, "nombre": 1, "fecha": 1, "lugar": 1}
+    return filtro_ctdo, proyeccion_ctdo
+  
 
 
 def inputCorreo():
@@ -118,6 +131,12 @@ def validar_dominio(dominio):
         return True
     return False
     
+def trynum(numero):
+    try: 
+        numero = int(numero)
+    except Exception:
+        return False, numero
+    return True, numero
 
 def listarEventos(coleccion):
     filtro_ctdo = {}
@@ -125,10 +144,14 @@ def listarEventos(coleccion):
     tipo = "Todos los eventos"
     estandar(coleccion, filtro_ctdo, proyeccion_ctdo, tipo)
     
-def listarInvitados(coleccion):
-    filtro_ctdo = {}
-    proyeccion_ctdo = {"_id" : 0}
-    tipo = "Todos los invitados"
+def listarInvitados(coleccion, filtro):
+    if filtro == "correo":
+        filtro_ctdo = {}
+        proyeccion_ctdo = {"_id": 0, "rut": 0, "empresa": 0, "estado": 0}
+    else:
+        filtro_ctdo = {}
+        proyeccion_ctdo = {"_id": 0, "correo": 0, "empresa": 0, "estado": 0}
+    tipo = "Todos los invitados3"
     estandar(coleccion, filtro_ctdo, proyeccion_ctdo, tipo)
     
 def errorVerificar():
@@ -145,8 +168,22 @@ def errorVerificar():
 def inputConfirmacion(coleccion1, coleccion2):
     while True:
         os.system('cls')
-        listarInvitados(coleccion2) 
-        rut_seleccion = input("Ingrese RUT del invitado: ")
+        print("¿Desea buscar empleados por correo o RUT? \n 1.- Correo \n 2.- RUT")
+        busqueda_seleccion = input("Ingrese: ")
+        if busqueda_seleccion == '1':
+            filtro = "correo"
+            break
+        elif busqueda_seleccion == '2':
+            filtro = "rut"
+            break
+        else: 
+            print("❗Ingrese solo números enteros del 1 al 2")
+            input('ENTER para continuar')
+            continue
+    while True:
+        os.system('cls')
+        listarInvitados(coleccion2, filtro) 
+        rut_seleccion = input("Ingrese RUT / Correo del invitado: ")
         col_sel = coleccion2
         valido_rut = verificacion(col_sel, coleccion1, coleccion2, rut_seleccion)
         if valido_rut:
@@ -167,29 +204,63 @@ def inputConfirmacion(coleccion1, coleccion2):
         else:
             errorVerificar()
             continue
-    pipeline = [
-            {"$match": {"codigo": codigo_seleccion}
-            },
+    if filtro == "rut":
+        pipeline = [
+                {"$match": {"codigo": codigo_seleccion}
+                },
+                {"$unwind": "$invitados"},
+                {"$match": {"invitados.rut": rut_seleccion, "invitados.estado": "confirmado"}
+                },
+                {"$lookup": {"from": "invitados", "localField": "invitados.rut", "foreignField": "rut", "as": "info_persona"}
+                },
+                {"$match": {"info_persona.estado": {"$ne": "bloqueado"}}
+                },
+                {"$project": {
+                        "_id": 0,
+                        "rut": "$invitados.rut",
+                        "nombre": {"$arrayElemAt": ["$info_persona.nombre", 0]},
+                        "nombre_evento": "$nombre",
+                        "fecha_evento": "$fecha",
+                        "lugar": "$lugar",
+                        "checkin": "$invitados.checkin"}
+                }
+            ]
+    else:
+        pipeline = [
+            {"$match": {"codigo": codigo_seleccion}},
             {"$unwind": "$invitados"},
-            {"$match": {"invitados.rut": rut_seleccion, "invitados.estado": "confirmado"}
+            {
+                "$lookup": {
+                    "from": "invitados", 
+                    "localField": "invitados.rut", 
+                    "foreignField": "rut", 
+                    "as": "info_persona"
+                }
             },
-            {"$lookup": {"from": "invitados", "localField": "invitados.rut", "foreignField": "rut", "as": "info_persona"}
+            {
+                "$match": {
+                    "invitados.estado": "confirmado",
+                    "info_persona.correo": rut_seleccion,
+                    "info_persona.estado": {"$ne": "bloqueado"} 
+                }
             },
-            {"$match": {"info_persona.estado": {"$ne": "bloqueado"}}
-            },
-            {"$project": {
+            {
+                "$project": {
                     "_id": 0,
                     "rut": "$invitados.rut",
                     "nombre": {"$arrayElemAt": ["$info_persona.nombre", 0]},
                     "nombre_evento": "$nombre",
                     "fecha_evento": "$fecha",
                     "lugar": "$lugar",
-                    "checkin": "$invitados.checkin"}
+                    "checkin": "$invitados.checkin"
+                }
             }
         ]
+
+        
     return pipeline
 
-def pipelineTop3():
+def pipelineTop3(numero):
     pipeline = [
         {"$unwind": "$invitados"},
         {"$match": {"invitados.estado": "confirmado"}},
@@ -203,7 +274,7 @@ def pipelineTop3():
             }
         },
         {"$sort": {"total_confirmados": -1}},
-        {"$limit": 3},
+        {"$limit": numero},
         {
             "$project": {
                 "_id": 0,
@@ -225,11 +296,12 @@ def menu():
     print("SISTEMA CONSULTAS MONGODB")
     print("="*75)
     print("\n 1.- Listar eventos")
-    print(" 2.- Buscar invitados por nombre ")
-    print(" 3.- Confirmar asistencia de invitado a evento")
+    print(" 2.- Buscar invitados por nombre / apellido ")
+    print(" 3.- Confirmar asistencia de invitado a evento (usando correo o rut)") #se reutilizo, pq la habiamos hecho con rut
     print(" 4.- Top 3 eventos más asistidos")
     print(" 5.- Buscar invitados por dominio de correo")
-    print(" 6.- Salir")
+    print(" 6.- Buscar eventos por categoria")
+    print(" 7.- Salir")
 
 def main():
     client, db = conexion()
@@ -243,11 +315,11 @@ def main():
         try:
             seleccion = int(seleccion)
         except ValueError:
-            print("⚠️ Ingrese solo números enteros entre 1 y 6")
+            print("⚠️ Ingrese solo números enteros entre 1 y 7")
             input("ENTER para continuar")
             continue
-        if seleccion <1 or seleccion >6:
-            print("⚠️ Ingrese solo números enteros entre 1 y 6")
+        if seleccion <1 or seleccion >7:
+            print("⚠️ Ingrese solo números enteros entre 1 y 7")
             input("ENTER para continuar")
             continue
         elif seleccion == 1:
@@ -256,20 +328,30 @@ def main():
 
         elif seleccion == 2:
             filtro_ctdo, proyeccion_ctdo = inputNombre()
-            tipo = "Nombre"
+            tipo = "Nombre / Apellido"
             estandar(col_invitados, filtro_ctdo, proyeccion_ctdo, tipo)
             input("ENTER para continuar")
 
         elif seleccion == 3:
             pipeline = inputConfirmacion(col_eventos, col_invitados)
             tipo = "Confirmación de invitado"
-            cruzada(col_eventos, pipeline, tipo)
+            numeroValido = 1
+            cruzada(col_eventos, pipeline, tipo, numeroValido)
             input("ENTER para continuar")
         elif seleccion == 4:
-            pipeline = pipelineTop3()
-            numero = input("Ingrese el número de eventos que desea ordenar ")
-            tipo = "Top {numero} eventos con más confirmados"
-            cruzada(col_eventos, pipeline, tipo)
+            while True:
+                os.system('cls')
+                numero = input("Ingrese el número de eventos que desea ordenar ")
+                valido, numeroValido = trynum(numero)
+                if valido == False:
+                    print("⚠️ Ingrese solo números enteros")
+                    input("ENTER para continuar")
+                    continue
+                break
+            
+            pipeline = pipelineTop3(numeroValido)
+            tipo = f"Top {numero} eventos con más confirmados"
+            cruzada(col_eventos, pipeline, tipo, numeroValido)
             input("ENTER para continuar")
         elif seleccion == 5:
             while True:
@@ -284,10 +366,16 @@ def main():
                     continue
                 break
         elif seleccion == 6:
+            filtro_ctdo, proyeccion_ctdo = inputCategoria()
+            tipo = "Categoria"
+            estandar(col_eventos, filtro_ctdo, proyeccion_ctdo, tipo)
+            input("ENTER para continuar")
+            
+        elif seleccion == 7:
             input("Presione ENTER para continuar...")
             os.system('cls')
             break
 
     client.close()
 
-main()
+main() 
