@@ -267,7 +267,8 @@ def main():
             input("ENTER para continuar")
         elif seleccion == 4:
             pipeline = pipelineTop3()
-            tipo = "Top 3 eventos con más confirmados"
+            numero = input("Ingrese el número de eventos que desea ordenar ")
+            tipo = "Top {numero} eventos con más confirmados"
             cruzada(col_eventos, pipeline, tipo)
             input("ENTER para continuar")
         elif seleccion == 5:
